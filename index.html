@@ -2,18 +2,20 @@
 <html lang="th">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>สร้างป้ายราคาสินค้า</title>
 <meta name="theme-color" content="#20231f">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="ป้ายราคา">
-<link id="manifestLink" rel="manifest" href="">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='20' fill='%2320231f'/%3E%3Ctext x='50' y='68' font-size='58' text-anchor='middle'%3E%F0%9F%8F%B7%EF%B8%8F%3C/text%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;500;600;700;800;900&family=Kanit:wght@500;600;700;800&display=swap" rel="stylesheet">
+<style id="pageStyle">@page{size:21cm 29.7cm;margin:0}</style>
 <style>
   :root{
     --ink:#20231f;
@@ -24,6 +26,8 @@
     --muted:#8a8474;
     --safe-b: env(safe-area-inset-bottom, 0px);
     --safe-t: env(safe-area-inset-top, 0px);
+    /* ตั้งค่าโดย JS */
+    --pw:21cm; --ph:29.7cm; --pgmargin:1cm; --gap:.3cm; --tw:7cm; --th:4cm; --cols:2;
   }
   *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
   html,body{margin:0;padding:0; height:100%; overscroll-behavior-y:none;}
@@ -35,7 +39,7 @@
     min-height:100dvh;
   }
   input, select, button, textarea{font-family:inherit;}
-  input, select{font-size:16px;} /* prevent iOS auto-zoom */
+  input, select{font-size:16px;} /* กัน iOS ซูมอัตโนมัติ */
 
   /* ---------- App bar ---------- */
   .appbar{
@@ -44,14 +48,11 @@
     display:flex; align-items:center; gap:10px;
     position:sticky; top:0; z-index:30;
   }
-  .appbar .title{
-    font-family:'Kanit',sans-serif; font-weight:700; font-size:17px; flex:1;
-  }
+  .appbar .title{ font-family:'Kanit',sans-serif; font-weight:700; font-size:17px; flex:1; }
   .iconbtn{
     background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.18);
     color:#fff; width:38px; height:38px; border-radius:10px;
-    font-size:17px; display:flex; align-items:center; justify-content:center;
-    cursor:pointer;
+    font-size:17px; display:flex; align-items:center; justify-content:center; cursor:pointer;
   }
 
   /* ---------- Tabs ---------- */
@@ -83,13 +84,12 @@
   }
   .field{margin-bottom:10px;}
   .field label{display:block; font-size:12.5px; color:var(--muted); margin-bottom:4px;}
-  .field input{
+  .field input, .field select{
     width:100%; padding:11px 12px; border:1px solid var(--line);
-    border-radius:10px; background:#fdfcfa;
+    border-radius:10px; background:#fdfcfa; color:var(--ink);
   }
   .row2{display:flex; gap:8px;}
   .row2 .field{flex:1;}
-  .qtyrow{display:flex; align-items:center; gap:10px;}
   .stepper{
     display:flex; align-items:center; gap:0; border:1px solid var(--line);
     border-radius:10px; overflow:hidden; background:#fdfcfa;
@@ -102,7 +102,8 @@
     width:50px; text-align:center; border:none; background:transparent;
     padding:0; height:42px; -moz-appearance:textfield;
   }
-  .stepper input::-webkit-outer-spin-button, .stepper input::-webkit-inner-spin-button{ -webkit-appearance:none; margin:0; }
+  .stepper input::-webkit-outer-spin-button, .stepper input::-webkit-inner-spin-button,
+  .itemcard .qty input::-webkit-outer-spin-button, .itemcard .qty input::-webkit-inner-spin-button{ -webkit-appearance:none; margin:0; }
 
   .bigbtn{
     width:100%; padding:14px; border:none; border-radius:12px; cursor:pointer;
@@ -110,6 +111,8 @@
     background:var(--ink); color:#fff;
   }
   .bigbtn:active{ opacity:.85; }
+  .check{ display:flex; align-items:center; gap:8px; font-size:14px; margin:2px 0 14px; cursor:pointer; }
+  .check input{ width:18px; height:18px; accent-color:var(--accent); }
 
   /* ---------- Item list ---------- */
   .itemcard{
@@ -120,7 +123,7 @@
   .itemcard .head{ display:flex; justify-content:space-between; align-items:flex-start; gap:8px; }
   .itemcard .head input{
     border:none; background:transparent; font-weight:600; font-size:15px; padding:2px 0;
-    flex:1; min-width:0;
+    flex:1; min-width:0; color:var(--ink);
   }
   .itemcard .del{
     background:#f6eae6; color:var(--accent); border:none; width:32px; height:32px;
@@ -132,13 +135,16 @@
     border-radius:9px; padding:6px 10px; background:#fdfcfa;
   }
   .itemcard .pricefield input{
-    border:none; background:transparent; width:64px; font-weight:700; color:var(--accent);
+    border:none; background:transparent; width:72px; font-weight:700; color:var(--accent);
   }
   .itemcard .pricefield .u{ color:var(--muted); font-size:12.5px; }
-  .itemcard .pricefield .u input{ width:44px; font-weight:500; color:var(--muted); }
+  .itemcard .pricefield .u input{ width:52px; font-weight:500; color:var(--muted); }
   .itemcard .qty{ display:flex; align-items:center; gap:0; border:1px solid var(--line); border-radius:9px; overflow:hidden; margin-left:auto; }
   .itemcard .qty button{ width:34px; height:34px; border:none; background:#efece2; font-size:16px; font-weight:700; cursor:pointer; }
-  .itemcard .qty span{ width:34px; text-align:center; font-size:14px; font-weight:600; }
+  .itemcard .qty input{
+    width:48px; height:34px; text-align:center; border:none; background:transparent;
+    font-size:14px; font-weight:600; padding:0; -moz-appearance:textfield; color:var(--ink);
+  }
 
   .empty-list{ text-align:center; color:#b6b0a0; font-size:13px; padding:24px 10px; }
 
@@ -147,32 +153,34 @@
     padding:12px 13px; font-size:12.8px; line-height:1.7; color:#5a4c33; margin-top:4px;
   }
   .infobar b{ color:var(--ink); }
+  .infobar .warn{ color:var(--accent); font-weight:600; }
 
   /* ---------- Preview tab ---------- */
-  .previewScroll{
-    width:100%; overflow:auto; border-radius:12px; background:#e9e6dc;
-    padding:12px; -webkit-overflow-scrolling:touch;
-  }
-  #scaleWrap{ transform-origin: top left; }
-  #printArea{
-    background:#fff; width:21cm; min-height:29.7cm;
-    padding: var(--pgmargin,1cm);
-    box-shadow:0 6px 22px rgba(0,0,0,.15);
-    display:flex; flex-wrap:wrap; align-content:flex-start;
-    gap: var(--gap,0.3cm);
+  .previewScroll{ width:100%; overflow:auto; border-radius:12px; background:#e9e6dc; padding:12px; -webkit-overflow-scrolling:touch; }
+  #scaleBox{ margin:0 auto; overflow:hidden; }
+  #scaleWrap{ transform-origin:top left; width:max-content; }
+  #pages{ display:flex; flex-direction:column; gap:.6cm; }
+  .sheet{
+    background:#fff; width:var(--pw); height:var(--ph); padding:var(--pgmargin);
+    box-shadow:0 6px 22px rgba(0,0,0,.15); overflow:hidden;
+    display:grid; grid-template-columns:repeat(var(--cols), var(--tw));
+    grid-auto-rows:var(--th); gap:var(--gap); align-content:start; justify-content:start;
   }
   .empty-hint{ width:100%; text-align:center; color:#b6b0a0; font-size:14px; padding:60px 16px; }
 
   .tag{
-    width: var(--tw,7cm); height: var(--th,4cm);
+    width:var(--tw); height:var(--th);
     border:1.6px dashed #b9b3a2; border-radius:4px; background:#fff;
     position:relative; display:flex; flex-direction:column; align-items:center; justify-content:center;
-    padding:6px 8%; overflow:hidden; break-inside:avoid; page-break-inside:avoid;
+    padding:0 8%; overflow:hidden; break-inside:avoid; page-break-inside:avoid;
   }
+  #pages.noborder .tag{ border-color:transparent; }
+  #pages.noborder .tag .corner{ display:none; }
   .tag .name{ font-weight:600; color:#3a362c; white-space:nowrap; line-height:1.15; text-align:center; max-width:100%; }
-  .tag .pricewrap{ display:flex; align-items:baseline; justify-content:center; gap:.12em; white-space:nowrap; max-width:100%; }
+  .tag .name.wrap{ white-space:normal; overflow-wrap:anywhere; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+  .tag .pricewrap{ display:flex; align-items:baseline; justify-content:center; white-space:nowrap; max-width:100%; }
   .tag .price{ font-family:'Kanit',sans-serif; font-weight:800; color:var(--accent); line-height:1; }
-  .tag .unit{ font-weight:600; color:var(--accent); opacity:.85; }
+  .tag .unit{ font-weight:600; color:var(--accent); opacity:.85; line-height:1; }
   .tag .corner{ position:absolute; top:5%; left:5%; width:10%; aspect-ratio:1; border-left:1.6px solid #cfa15a; border-top:1.6px solid #cfa15a; opacity:.5; }
 
   /* ---------- Bottom bar ---------- */
@@ -190,6 +198,16 @@
   }
   .printfab:active{ transform:scale(.98); }
 
+  /* ---------- Toast ---------- */
+  .toast{
+    position:fixed; left:50%; bottom:calc(88px + var(--safe-b)); z-index:60;
+    transform:translateX(-50%) translateY(10px);
+    background:var(--ink); color:#fff; padding:10px 16px; border-radius:999px;
+    font-size:13.5px; opacity:0; pointer-events:none; transition:opacity .2s, transform .2s;
+    max-width:90%; text-align:center;
+  }
+  .toast.show{ opacity:1; transform:translateX(-50%) translateY(0); }
+
   /* ---------- Modal ---------- */
   .modal{
     position:fixed; inset:0; background:rgba(20,18,14,.5); z-index:50;
@@ -198,15 +216,15 @@
   .modal.hidden{ display:none; }
   .modalcard{
     background:#fff; width:100%; max-width:560px; border-radius:18px 18px 0 0;
-    padding:18px 18px calc(18px + var(--safe-b)); max-height:85vh; overflow:auto;
+    padding:18px 18px calc(18px + var(--safe-b)); max-height:88vh; overflow:auto;
   }
   .modalcard h3{ font-family:'Kanit',sans-serif; margin:0 0 14px; font-size:16px; }
   .modalcard .closebar{ display:flex; justify-content:flex-end; margin-bottom:-6px; }
-  .modalcard .closebar button{ background:none; border:none; font-size:14px; color:var(--muted); }
+  .modalcard .closebar button{ background:none; border:none; font-size:14px; color:var(--muted); cursor:pointer; }
   .sizechips{ display:flex; flex-wrap:wrap; gap:8px; margin-bottom:12px; }
   .chip{
     padding:9px 14px; border-radius:999px; border:1px solid var(--line); background:#fdfcfa;
-    font-size:13.5px; cursor:pointer;
+    font-size:13.5px; cursor:pointer; color:var(--ink);
   }
   .chip.active{ background:var(--ink); color:#fff; border-color:var(--ink); }
   .instalhint{ font-size:12px; color:var(--muted); line-height:1.6; margin-top:10px; padding-top:10px; border-top:1px dashed var(--line); }
@@ -215,16 +233,25 @@
     .appbar, .tabs{ padding-left:calc((100% - 560px)/2 + 16px); padding-right:calc((100% - 560px)/2 + 16px); }
   }
 
+  /* ---------- พิมพ์ ---------- */
   @media print{
-    body{background:#fff; display:block; min-height:0;}
-    .appbar, .tabs, .bottombar, .modal{ display:none !important; }
-    main{ max-width:none; padding:0; }
-    .tabpanel{ display:none !important; padding:0; }
-    #tab-preview{ display:block !important; }
-    .previewScroll{ overflow:visible !important; background:none !important; padding:0 !important; border-radius:0; }
+    *{ -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+    html,body{ height:auto !important; background:#fff !important; }
+    body{ display:block; min-height:0; }
+    .appbar, .tabs, .bottombar, .modal, .toast{ display:none !important; }
+    main{ max-width:none; margin:0; padding:0; }
+    .tabpanel{ display:none !important; }
+    #tab-preview{ display:block !important; padding:0 !important; }
+    .previewScroll{ overflow:visible !important; background:none !important; padding:0 !important; height:auto !important; border-radius:0; }
+    #scaleBox{ width:auto !important; height:auto !important; overflow:visible !important; margin:0 !important; }
     #scaleWrap{ transform:none !important; width:auto !important; }
-    #printArea{ box-shadow:none !important; width:auto !important; min-height:0 !important; margin:0 !important; padding:0 !important; }
-    @page{ size:A4; margin: var(--pgmargin,1cm); }
+    #pages{ display:block; }
+    .sheet{
+      box-shadow:none !important; margin:0 !important;
+      height:calc(var(--ph) - 1.5mm);  /* กันหน้าว่างท้ายเอกสารจากการปัดเศษ */
+      break-after:page; page-break-after:always;
+    }
+    .sheet:last-child{ break-after:auto; page-break-after:auto; }
   }
 </style>
 </head>
@@ -232,7 +259,7 @@
 
 <div class="appbar">
   <div class="title">🏷️ ป้ายราคาสินค้า</div>
-  <button class="iconbtn" id="settingsBtn">⚙️</button>
+  <button class="iconbtn" id="settingsBtn" aria-label="ตั้งค่า">⚙️</button>
 </div>
 
 <div class="tabs">
@@ -246,20 +273,20 @@
       <h2>เพิ่มป้ายใหม่</h2>
       <div class="field">
         <label>ชื่อสินค้า</label>
-        <input type="text" id="inName" placeholder="เช่น น้ำดื่มขนาด 600 มล.">
+        <input type="text" id="inName" placeholder="เช่น น้ำดื่มขนาด 600 มล." enterkeyhint="next">
       </div>
       <div class="field">
         <label>ราคา / หน่วย</label>
         <div class="row2">
-          <input type="text" id="inPrice" placeholder="ราคา เช่น 10" inputmode="decimal">
-          <input type="text" id="inUnit" placeholder="หน่วย" value="บาท" style="max-width:100px;">
+          <input type="text" id="inPrice" placeholder="ราคา เช่น 10" inputmode="decimal" enterkeyhint="done">
+          <input type="text" id="inUnit" placeholder="หน่วย" value="บาท" style="max-width:100px;" enterkeyhint="done">
         </div>
       </div>
       <div class="field">
         <label>จำนวนป้าย</label>
         <div class="stepper" style="width:140px;">
           <button type="button" id="qMinus">−</button>
-          <input type="number" id="inQty" value="1" min="1" max="500">
+          <input type="number" id="inQty" value="1" min="1" max="500" inputmode="numeric">
           <button type="button" id="qPlus">+</button>
         </div>
       </div>
@@ -272,8 +299,10 @@
 
   <section id="tab-preview" class="tabpanel">
     <div class="previewScroll">
-      <div id="scaleWrap">
-        <div id="printArea"></div>
+      <div id="scaleBox">
+        <div id="scaleWrap">
+          <div id="pages"></div>
+        </div>
       </div>
     </div>
   </section>
@@ -282,6 +311,8 @@
 <div class="bottombar">
   <button class="printfab" id="printBtn">🖨 พิมพ์ / บันทึกเป็น PDF</button>
 </div>
+
+<div class="toast" id="toast" role="status"></div>
 
 <div class="modal hidden" id="settingsModal">
   <div class="modalcard">
@@ -295,13 +326,32 @@
       <button class="chip" data-w="10" data-h="7">10×7 ซม.</button>
     </div>
     <div class="row2">
-      <div class="field"><label>กว้าง (ซม.)</label><input type="number" id="customW" min="2" max="20" step="0.5"></div>
-      <div class="field"><label>สูง (ซม.)</label><input type="number" id="customH" min="2" max="20" step="0.5"></div>
+      <div class="field"><label>กว้าง (ซม.)</label><input type="number" id="customW" min="2" max="40" step="0.5" inputmode="decimal"></div>
+      <div class="field"><label>สูง (ซม.)</label><input type="number" id="customH" min="2" max="40" step="0.5" inputmode="decimal"></div>
     </div>
     <div class="row2">
-      <div class="field"><label>ระยะขอบกระดาษ (ซม.)</label><input type="number" id="pgMargin" min="0" max="3" step="0.1"></div>
-      <div class="field"><label>ระยะห่างป้าย (ซม.)</label><input type="number" id="gapSize" min="0" max="2" step="0.1"></div>
+      <div class="field"><label>ระยะขอบกระดาษ (ซม.)</label><input type="number" id="pgMargin" min="0" max="3" step="0.1" inputmode="decimal"></div>
+      <div class="field"><label>ระยะห่างป้าย (ซม.)</label><input type="number" id="gapSize" min="0" max="2" step="0.1" inputmode="decimal"></div>
     </div>
+    <div class="row2">
+      <div class="field">
+        <label>ขนาดกระดาษ</label>
+        <select id="paperSel">
+          <option value="A4">A4</option>
+          <option value="A5">A5</option>
+          <option value="A3">A3</option>
+          <option value="Letter">Letter</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>แนวกระดาษ</label>
+        <select id="orientSel">
+          <option value="portrait">แนวตั้ง</option>
+          <option value="landscape">แนวนอน</option>
+        </select>
+      </div>
+    </div>
+    <label class="check"><input type="checkbox" id="borderChk"> แสดงเส้นประสำหรับตัด</label>
     <button class="bigbtn" id="clearBtn" style="background:#f6eae6; color:var(--accent); margin-bottom:8px;">🗑 ล้างรายการทั้งหมด</button>
     <button class="bigbtn" id="doneSettings">เสร็จสิ้น</button>
     <div class="instalhint">
@@ -311,203 +361,347 @@
 </div>
 
 <script>
+'use strict';
 const STORAGE_KEY = 'priceTagMaker_v2';
+const PAPERS = { A4:[21,29.7], A5:[14.8,21], A3:[29.7,42], Letter:[21.59,27.94] };
+const DEFAULTS = { w:7, h:4, pgMargin:1, gap:0.3, paper:'A4', landscape:false, border:true, defs:[] };
+const MAX_QTY = 500;
+const $ = id => document.getElementById(id);
 
-let state = { w:7, h:4, pgMargin:1, gap:0.3, defs:[] };
+let state = Object.assign({}, DEFAULTS, { defs:[] });
 
+/* ---------- Helpers ---------- */
+function uid(){ return 'id' + Math.random().toString(36).slice(2, 9); }
+function esc(s){
+  return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function clampNum(v, min, max, fallback){
+  const n = parseFloat(v);
+  return Number.isFinite(n) ? Math.min(max, Math.max(min, n)) : fallback;
+}
+function clampQty(v){ return Math.min(MAX_QTY, Math.max(1, parseInt(v, 10) || 1)); }
+
+let toastTimer = 0;
+function toast(msg){
+  const t = $('toast'); t.textContent = msg; t.classList.add('show');
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('show'), 1800);
+}
+
+/* ---------- Storage ---------- */
 function load(){
-  try{ const raw = localStorage.getItem(STORAGE_KEY); if(raw) state = Object.assign(state, JSON.parse(raw)); }catch(e){}
+  let hadSaved = false;
+  try{
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if(raw){ hadSaved = true; Object.assign(state, JSON.parse(raw)); }
+  }catch(e){}
+  state.w = clampNum(state.w, 2, 40, 7);
+  state.h = clampNum(state.h, 2, 40, 4);
+  state.pgMargin = clampNum(state.pgMargin, 0, 3, 1);
+  state.gap = clampNum(state.gap, 0, 2, 0.3);
+  if(!PAPERS[state.paper]) state.paper = 'A4';
+  state.landscape = !!state.landscape;
+  state.border = state.border !== false;
+  if(!Array.isArray(state.defs)) state.defs = [];
+  state.defs = state.defs.filter(d => d && typeof d === 'object').map(d => ({
+    id: d.id || uid(), name: String(d.name == null ? '' : d.name),
+    price: String(d.price == null ? '' : d.price), unit: String(d.unit == null ? '' : d.unit), qty: clampQty(d.qty)
+  }));
+  return hadSaved;
 }
 function save(){ try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }catch(e){} }
-function uid(){ return 'id'+Math.random().toString(36).slice(2,9); }
-function escapeHtml(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
-function escapeAttr(s){ return (s||'').replace(/"/g,'&quot;'); }
 
 /* ---------- Tabs ---------- */
-document.querySelectorAll('.tabbtn').forEach(btn=>{
-  btn.addEventListener('click', ()=>{
-    document.querySelectorAll('.tabbtn').forEach(b=>b.classList.remove('active'));
-    document.querySelectorAll('.tabpanel').forEach(p=>p.classList.remove('active'));
-    btn.classList.add('active');
-    document.getElementById('tab-'+btn.dataset.tab).classList.add('active');
-    if(btn.dataset.tab==='preview') requestAnimationFrame(updatePreviewScale);
-  });
-});
+function switchTab(name){
+  document.querySelectorAll('.tabbtn').forEach(b => b.classList.toggle('active', b.dataset.tab === name));
+  document.querySelectorAll('.tabpanel').forEach(p => p.classList.toggle('active', p.id === 'tab-' + name));
+  if(name === 'preview') requestAnimationFrame(updatePreviewScale);
+}
+document.querySelectorAll('.tabbtn').forEach(btn => btn.addEventListener('click', () => switchTab(btn.dataset.tab)));
 
 /* ---------- Settings modal ---------- */
-const settingsModal = document.getElementById('settingsModal');
-document.getElementById('settingsBtn').addEventListener('click', ()=>{ settingsModal.classList.remove('hidden'); syncSettingsUI(); });
-document.getElementById('closeSettings').addEventListener('click', ()=> settingsModal.classList.add('hidden'));
-document.getElementById('doneSettings').addEventListener('click', ()=> settingsModal.classList.add('hidden'));
+const settingsModal = $('settingsModal');
+const customW = $('customW'), customH = $('customH');
+const pgMarginInput = $('pgMargin'), gapInput = $('gapSize');
+const paperSel = $('paperSel'), orientSel = $('orientSel'), borderChk = $('borderChk');
 
-const customW = document.getElementById('customW');
-const customH = document.getElementById('customH');
-const pgMarginInput = document.getElementById('pgMargin');
-const gapInput = document.getElementById('gapSize');
+function openSettings(){ settingsModal.classList.remove('hidden'); syncSettingsUI(true); }
+function closeSettings(){ settingsModal.classList.add('hidden'); }
+$('settingsBtn').addEventListener('click', openSettings);
+$('closeSettings').addEventListener('click', closeSettings);
+$('doneSettings').addEventListener('click', closeSettings);
+settingsModal.addEventListener('click', e => { if(e.target === settingsModal) closeSettings(); });
+document.addEventListener('keydown', e => { if(e.key === 'Escape') closeSettings(); });
 
-function syncSettingsUI(){
-  customW.value = state.w; customH.value = state.h;
-  pgMarginInput.value = state.pgMargin; gapInput.value = state.gap;
-  document.querySelectorAll('.chip').forEach(c=>{
-    c.classList.toggle('active', parseFloat(c.dataset.w)===state.w && parseFloat(c.dataset.h)===state.h);
+/* full=false: อัปเดตแค่ปุ่มขนาด (ไม่เขียนทับช่องที่กำลังพิมพ์ เช่น "8." ) */
+function syncSettingsUI(full){
+  if(full){
+    customW.value = state.w; customH.value = state.h;
+    pgMarginInput.value = state.pgMargin; gapInput.value = state.gap;
+    paperSel.value = state.paper; orientSel.value = state.landscape ? 'landscape' : 'portrait';
+    borderChk.checked = state.border;
+  }
+  document.querySelectorAll('.chip').forEach(c => {
+    c.classList.toggle('active', parseFloat(c.dataset.w) === state.w && parseFloat(c.dataset.h) === state.h);
   });
 }
-document.getElementById('sizeChips').addEventListener('click', (e)=>{
+function applySettings(){ renderPrintArea(); save(); }
+
+$('sizeChips').addEventListener('click', e => {
   const chip = e.target.closest('.chip'); if(!chip) return;
   state.w = parseFloat(chip.dataset.w); state.h = parseFloat(chip.dataset.h);
-  syncSettingsUI(); renderAll();
+  syncSettingsUI(true); applySettings();
 });
-customW.addEventListener('input', ()=>{ state.w = parseFloat(customW.value)||7; syncSettingsUI(); renderAll(); });
-customH.addEventListener('input', ()=>{ state.h = parseFloat(customH.value)||4; syncSettingsUI(); renderAll(); });
-pgMarginInput.addEventListener('input', ()=>{ state.pgMargin = parseFloat(pgMarginInput.value)||0; renderAll(); });
-gapInput.addEventListener('input', ()=>{ state.gap = parseFloat(gapInput.value)||0; renderAll(); });
+customW.addEventListener('input', () => { state.w = clampNum(customW.value, 2, 40, state.w); syncSettingsUI(false); applySettings(); });
+customH.addEventListener('input', () => { state.h = clampNum(customH.value, 2, 40, state.h); syncSettingsUI(false); applySettings(); });
+pgMarginInput.addEventListener('input', () => { state.pgMargin = clampNum(pgMarginInput.value, 0, 3, state.pgMargin); applySettings(); });
+gapInput.addEventListener('input', () => { state.gap = clampNum(gapInput.value, 0, 2, state.gap); applySettings(); });
+[customW, customH, pgMarginInput, gapInput].forEach(i => i.addEventListener('change', () => syncSettingsUI(true)));
+paperSel.addEventListener('change', () => { state.paper = paperSel.value; applySettings(); });
+orientSel.addEventListener('change', () => { state.landscape = orientSel.value === 'landscape'; applySettings(); });
+borderChk.addEventListener('change', () => { state.border = borderChk.checked; applySettings(); });
 
-document.getElementById('clearBtn').addEventListener('click', ()=>{
-  if(confirm('ล้างรายการป้ายทั้งหมด?')){ state.defs=[]; settingsModal.classList.add('hidden'); renderAll(); }
+$('clearBtn').addEventListener('click', () => {
+  if(confirm('ล้างรายการป้ายทั้งหมด?')){ state.defs = []; closeSettings(); renderAll(); }
 });
 
 /* ---------- Quick add ---------- */
-const inQty = document.getElementById('inQty');
-document.getElementById('qMinus').addEventListener('click', ()=>{ inQty.value = Math.max(1,(parseInt(inQty.value)||1)-1); });
-document.getElementById('qPlus').addEventListener('click', ()=>{ inQty.value = Math.min(500,(parseInt(inQty.value)||1)+1); });
+const inName = $('inName'), inPrice = $('inPrice'), inUnit = $('inUnit'), inQty = $('inQty');
+$('qMinus').addEventListener('click', () => { inQty.value = clampQty((parseInt(inQty.value, 10) || 1) - 1); });
+$('qPlus').addEventListener('click', () => { inQty.value = clampQty((parseInt(inQty.value, 10) || 1) + 1); });
+inQty.addEventListener('change', () => { inQty.value = clampQty(inQty.value); });
 
-document.getElementById('addBtn').addEventListener('click', ()=>{
-  const name = document.getElementById('inName').value.trim() || 'ชื่อสินค้า';
-  const price = document.getElementById('inPrice').value.trim() || '0';
-  const unit = document.getElementById('inUnit').value.trim() || 'บาท';
-  const qty = Math.max(1, parseInt(inQty.value)||1);
-  state.defs.push({id:uid(), name, price, unit, qty});
-  document.getElementById('inName').value=''; document.getElementById('inPrice').value=''; inQty.value=1;
+function addTag(){
+  const name = inName.value.trim();
+  const price = inPrice.value.trim();
+  const unit = inUnit.value.trim();
+  if(!price){ toast('กรุณากรอกราคา'); inPrice.focus(); return; }
+  state.defs.push({ id: uid(), name, price, unit, qty: clampQty(inQty.value) });
+  inName.value = ''; inPrice.value = ''; inQty.value = 1;
   renderAll();
-});
-
-document.getElementById('printBtn').addEventListener('click', ()=> window.print());
+  toast('เพิ่มป้ายแล้ว');
+  inName.focus();
+}
+$('addBtn').addEventListener('click', addTag);
+inName.addEventListener('keydown', e => { if(e.key === 'Enter'){ e.preventDefault(); inPrice.focus(); } });
+[inPrice, inUnit].forEach(i => i.addEventListener('keydown', e => { if(e.key === 'Enter'){ e.preventDefault(); addTag(); } }));
 
 /* ---------- Render list ---------- */
-const defsList = document.getElementById('defsList');
+const defsList = $('defsList');
 function renderDefsList(){
-  if(state.defs.length===0){ defsList.innerHTML = '<p class="empty-list">ยังไม่มีป้าย — เพิ่มด้านบนได้เลย</p>'; return; }
-  defsList.innerHTML='';
-  state.defs.forEach(d=>{
-    const card = document.createElement('div');
-    card.className='itemcard';
-    card.innerHTML = `
+  if(state.defs.length === 0){
+    defsList.innerHTML = '<p class="empty-list">ยังไม่มีป้าย — เพิ่มด้านบนได้เลย</p>';
+    return;
+  }
+  defsList.innerHTML = state.defs.map(d => `
+    <div class="itemcard">
       <div class="head">
-        <input type="text" data-field="name" data-id="${d.id}" value="${escapeAttr(d.name)}" placeholder="ชื่อสินค้า">
-        <button class="del" data-id="${d.id}">✕</button>
+        <input type="text" data-field="name" data-id="${d.id}" value="${esc(d.name)}" placeholder="ชื่อสินค้า">
+        <button class="del" data-act="del" data-id="${d.id}" aria-label="ลบ">✕</button>
       </div>
       <div class="sub">
         <div class="pricefield">
-          <input type="text" data-field="price" data-id="${d.id}" value="${escapeAttr(d.price)}" style="width:56px;">
-          <span class="u"><input type="text" data-field="unit" data-id="${d.id}" value="${escapeAttr(d.unit)}"></span>
+          <input type="text" inputmode="decimal" data-field="price" data-id="${d.id}" value="${esc(d.price)}">
+          <span class="u"><input type="text" data-field="unit" data-id="${d.id}" value="${esc(d.unit)}" placeholder="หน่วย"></span>
         </div>
         <div class="qty">
-          <button data-act="minus" data-id="${d.id}">−</button>
-          <span>${d.qty}</span>
-          <button data-act="plus" data-id="${d.id}">+</button>
+          <button data-act="minus" data-id="${d.id}" aria-label="ลด">−</button>
+          <input type="number" inputmode="numeric" min="1" max="${MAX_QTY}" data-field="qty" data-id="${d.id}" value="${d.qty}">
+          <button data-act="plus" data-id="${d.id}" aria-label="เพิ่ม">+</button>
         </div>
-      </div>`;
-    defsList.appendChild(card);
-  });
+      </div>
+    </div>`).join('');
+}
 
-  defsList.querySelectorAll('input').forEach(inp=>{
-    inp.addEventListener('input', ()=>{
-      const def = state.defs.find(x=>x.id===inp.dataset.id); if(!def) return;
-      def[inp.dataset.field] = inp.value;
-      renderPrintArea(); save();
-    });
-  });
-  defsList.querySelectorAll('.del').forEach(btn=>{
-    btn.addEventListener('click', ()=>{ state.defs = state.defs.filter(x=>x.id!==btn.dataset.id); renderAll(); });
-  });
-  defsList.querySelectorAll('.qty button').forEach(btn=>{
-    btn.addEventListener('click', ()=>{
-      const def = state.defs.find(x=>x.id===btn.dataset.id); if(!def) return;
-      if(btn.dataset.act==='plus') def.qty = Math.min(500, def.qty+1);
-      else def.qty = Math.max(1, def.qty-1);
-      renderAll();
-    });
-  });
+/* event delegation: ผูกครั้งเดียว ไม่ต้องผูกใหม่ทุกครั้งที่ render */
+defsList.addEventListener('input', e => {
+  const el = e.target, id = el.dataset.id, f = el.dataset.field;
+  if(!id || !f) return;
+  const def = state.defs.find(x => x.id === id); if(!def) return;
+  if(f === 'qty'){
+    const v = parseInt(el.value, 10);
+    if(!Number.isFinite(v)) return;          // กำลังลบเพื่อพิมพ์ใหม่
+    def.qty = clampQty(v);
+  }else{
+    def[f] = el.value;
+  }
+  save(); schedulePrint();
+});
+defsList.addEventListener('change', e => {
+  const el = e.target;
+  if(el.dataset.field === 'qty'){
+    const def = state.defs.find(x => x.id === el.dataset.id);
+    if(def) el.value = def.qty;
+  }
+});
+defsList.addEventListener('click', e => {
+  const btn = e.target.closest('button[data-act]'); if(!btn) return;
+  const id = btn.dataset.id, act = btn.dataset.act;
+  if(act === 'del'){
+    state.defs = state.defs.filter(x => x.id !== id);
+    renderAll(); return;
+  }
+  const def = state.defs.find(x => x.id === id); if(!def) return;
+  def.qty = clampQty(def.qty + (act === 'plus' ? 1 : -1));
+  const qi = btn.parentElement.querySelector('input'); if(qi) qi.value = def.qty;
+  save(); schedulePrint();
+});
+
+/* ---------- ขนาดตัวอักษร: คำนวณด้วย canvas เป็นหน่วย ซม. ----------
+   ไม่พึ่งการวัด DOM จึงได้ผลเหมือนกันทั้งหน้าจอ / พรีวิว / พิมพ์
+   (แท็บพรีวิวที่ถูกซ่อนอยู่ไม่ทำให้คำนวณผิดอีกต่อไป) */
+const mctx = document.createElement('canvas').getContext('2d');
+const NAME_FONT = "'Noto Sans Thai', sans-serif";
+const PRICE_FONT = "'Kanit', sans-serif";
+function emWidth(text, weight, family){
+  if(!text) return 0;
+  mctx.font = `${weight} 100px ${family}`;
+  return mctx.measureText(text).width / 100;
+}
+function computeSizes(d){
+  const w = state.w, h = state.h;
+  const innerW = w * 0.84, innerH = h * 0.84;
+
+  // ชื่อสินค้า
+  const nameMax = Math.min(h * 0.18, 1.2), nameMin = 0.3;
+  let nameSize = Math.min(nameMax, innerW / Math.max(emWidth(d.name, 600, NAME_FONT), 0.01));
+  let wrap = false;
+  if(nameSize < nameMin){ nameSize = nameMin; wrap = true; }   // ยาวมาก → ตัดเป็น 2 บรรทัด
+  const nameBlock = d.name ? (wrap ? 2 : 1) * 1.15 * nameSize : 0;
+
+  // ราคา + หน่วย (วัดรวมกันทั้งบรรทัด)
+  const UNIT_RATIO = 0.34, GAP_RATIO = 0.12;
+  const perEm = emWidth(d.price, 800, PRICE_FONT) +
+                (d.unit ? GAP_RATIO + UNIT_RATIO * emWidth(d.unit, 600, NAME_FONT) : 0);
+  let priceSize = Math.min(h * 0.55, innerW / Math.max(perEm, 0.01));
+  priceSize = Math.min(priceSize, Math.max(0.35, innerH - nameBlock));
+  priceSize = Math.max(priceSize, 0.35);
+  const unitSize = Math.max(priceSize * UNIT_RATIO, Math.min(0.3, priceSize * 0.7));
+
+  return { nameSize, wrap, priceSize, unitSize, gap: priceSize * GAP_RATIO };
+}
+function tagHTML(d){
+  const s = computeSizes(d);
+  const nameHtml = d.name
+    ? `<div class="name${s.wrap ? ' wrap' : ''}" style="font-size:${s.nameSize.toFixed(3)}cm">${esc(d.name)}</div>` : '';
+  const unitHtml = d.unit
+    ? `<div class="unit" style="font-size:${s.unitSize.toFixed(3)}cm">${esc(d.unit)}</div>` : '';
+  return `<div class="tag"><div class="corner"></div>${nameHtml}` +
+         `<div class="pricewrap" style="gap:${s.gap.toFixed(3)}cm">` +
+         `<div class="price" style="font-size:${s.priceSize.toFixed(3)}cm">${esc(d.price)}</div>${unitHtml}</div></div>`;
+}
+
+/* ---------- Layout ---------- */
+function getLayout(){
+  let [pw, ph] = PAPERS[state.paper] || PAPERS.A4;
+  if(state.landscape) [pw, ph] = [ph, pw];
+  const EPS = 1e-4;
+  const usableW = pw - state.pgMargin * 2, usableH = ph - state.pgMargin * 2;
+  const cols = Math.floor((usableW + state.gap + EPS) / (state.w + state.gap));
+  const rows = Math.floor((usableH + state.gap + EPS) / (state.h + state.gap));
+  const fits = cols >= 1 && rows >= 1;
+  const c = Math.max(1, cols), r = Math.max(1, rows);
+  return { pw, ph, cols: c, rows: r, perPage: c * r, fits };
 }
 
 /* ---------- Render print area ---------- */
-const printArea = document.getElementById('printArea');
-const infoBox = document.getElementById('infoBox');
-
-function autoFit(el, maxPx, minPx){
-  let size = maxPx; el.style.fontSize = size+'px';
-  let guard=0;
-  while(guard++ < 60){
-    if(el.scrollWidth <= el.clientWidth + 1 || size <= minPx) break;
-    size -= 1; el.style.fontSize = size+'px';
-  }
-}
-function fitAllTags(){
-  document.querySelectorAll('.tag').forEach(tag=>{
-    const nameEl = tag.querySelector('.name'), priceEl = tag.querySelector('.price'), unitEl = tag.querySelector('.unit');
-    autoFit(nameEl, 30, 8); autoFit(priceEl, 96, 14);
-    unitEl.style.fontSize = Math.max(10,(parseFloat(priceEl.style.fontSize)||24)*0.34)+'px';
-  });
-}
+const pagesEl = $('pages'), infoBox = $('infoBox'), pageStyle = $('pageStyle');
+let lastLayout = getLayout();
+let totalTags = 0;
 
 function renderPrintArea(){
-  document.documentElement.style.setProperty('--pgmargin', state.pgMargin+'cm');
-  document.documentElement.style.setProperty('--gap', state.gap+'cm');
-  document.documentElement.style.setProperty('--tw', state.w+'cm');
-  document.documentElement.style.setProperty('--th', state.h+'cm');
+  const L = lastLayout = getLayout();
+  const root = document.documentElement.style;
+  root.setProperty('--pw', L.pw + 'cm');
+  root.setProperty('--ph', L.ph + 'cm');
+  root.setProperty('--pgmargin', state.pgMargin + 'cm');
+  root.setProperty('--gap', state.gap + 'cm');
+  root.setProperty('--tw', state.w + 'cm');
+  root.setProperty('--th', state.h + 'cm');
+  root.setProperty('--cols', L.cols);
+  // @page ใช้ var() ไม่ได้ในหลายเบราว์เซอร์ จึงเขียนค่าจริงลงไปตรง ๆ
+  pageStyle.textContent = `@page{size:${L.pw}cm ${L.ph}cm;margin:0}`;
+  pagesEl.classList.toggle('noborder', !state.border);
 
-  printArea.innerHTML=''; let total=0;
-  state.defs.forEach(d=>{
-    total += d.qty;
-    for(let i=0;i<d.qty;i++){
-      const tag = document.createElement('div'); tag.className='tag';
-      tag.innerHTML = `<div class="corner"></div>
-        <div class="name">${escapeHtml(d.name)}</div>
-        <div class="pricewrap"><div class="price">${escapeHtml(d.price)}</div><div class="unit">${escapeHtml(d.unit)}</div></div>`;
-      printArea.appendChild(tag);
-    }
+  const all = [];
+  state.defs.forEach(d => {
+    const html = tagHTML(d);
+    for(let i = 0; i < d.qty; i++) all.push(html);
   });
-  if(total===0) printArea.innerHTML = '<div class="empty-hint">ยังไม่มีป้าย — ไปที่แท็บ "รายการป้าย" เพื่อเริ่มเพิ่ม</div>';
+  totalTags = all.length;
 
-  requestAnimationFrame(()=>{ fitAllTags(); updatePreviewScale(); });
-  updateInfo(total);
+  if(totalTags === 0){
+    pagesEl.innerHTML = '<div class="empty-hint">ยังไม่มีป้าย — ไปที่แท็บ "รายการป้าย" เพื่อเริ่มเพิ่ม</div>';
+  }else{
+    let out = '';
+    for(let i = 0; i < all.length; i += L.perPage){
+      out += `<div class="sheet">${all.slice(i, i + L.perPage).join('')}</div>`;
+    }
+    pagesEl.innerHTML = out;
+  }
+  updateInfo();
+  requestAnimationFrame(updatePreviewScale);
 }
 
-function updateInfo(total){
-  const pageW = 21 - state.pgMargin*2, pageH = 29.7 - state.pgMargin*2;
-  const cols = Math.max(1, Math.floor((pageW+state.gap)/(state.w+state.gap)));
-  const rows = Math.max(1, Math.floor((pageH+state.gap)/(state.h+state.gap)));
-  const perPage = cols*rows;
-  const pages = total===0 ? 0 : Math.ceil(total/perPage);
-  infoBox.innerHTML = `ป้ายทั้งหมด <b>${total}</b> ชิ้น · จุได้ <b>${perPage}</b> ชิ้น/หน้า A4 (${cols}×${rows})<br>ใช้กระดาษประมาณ <b>${pages}</b> แผ่น`;
+function updateInfo(){
+  const L = lastLayout;
+  const pages = totalTags === 0 ? 0 : Math.ceil(totalTags / L.perPage);
+  let html = `ป้ายทั้งหมด <b>${totalTags}</b> ชิ้น · จุได้ <b>${L.perPage}</b> ชิ้น/หน้า ${state.paper}${state.landscape ? ' แนวนอน' : ''} (${L.cols}×${L.rows})<br>ใช้กระดาษประมาณ <b>${pages}</b> แผ่น`;
+  if(!L.fits) html += '<br><span class="warn">⚠ ป้ายใหญ่กว่าพื้นที่กระดาษ ลองลดขนาดป้าย/ระยะขอบ หรือเปลี่ยนขนาดกระดาษ</span>';
+  infoBox.innerHTML = html;
 }
 
-/* ---------- Preview scaling for mobile ---------- */
+/* พิมพ์ตอนพิมพ์ชื่อ/ราคาในรายการ: รวมหลายครั้งใน 1 เฟรม */
+let rafId = 0;
+function schedulePrint(){
+  if(rafId) return;
+  rafId = requestAnimationFrame(() => { rafId = 0; renderPrintArea(); });
+}
+
+/* ---------- Preview scaling (มือถือ) ---------- */
 function updatePreviewScale(){
   const scrollEl = document.querySelector('.previewScroll');
-  const scaleWrap = document.getElementById('scaleWrap');
-  if(!scrollEl || printArea.offsetWidth===0) return;
+  const box = $('scaleBox'), wrap = $('scaleWrap');
+  if(!scrollEl || !wrap.offsetWidth) return;   // แท็บถูกซ่อนอยู่ → ไว้ไปคำนวณตอนเปิดแท็บ
   const availW = scrollEl.clientWidth - 24;
-  const naturalW = printArea.offsetWidth;
-  const scale = Math.min(1, availW/naturalW);
-  scaleWrap.style.transform = `scale(${scale})`;
-  scrollEl.style.height = (printArea.offsetHeight*scale + 24) + 'px';
+  const scale = Math.min(1, availW / wrap.offsetWidth);
+  wrap.style.transform = `scale(${scale})`;
+  box.style.width = (wrap.offsetWidth * scale) + 'px';
+  box.style.height = (wrap.offsetHeight * scale) + 'px';
 }
-window.addEventListener('resize', ()=> requestAnimationFrame(()=>{ fitAllTags(); updatePreviewScale(); }));
-window.addEventListener('beforeprint', fitAllTags);
+window.addEventListener('resize', () => requestAnimationFrame(updatePreviewScale));
 
-/* ---------- PWA manifest (installable) ---------- */
-const manifest = {
-  name:"สร้างป้ายราคาสินค้า", short_name:"ป้ายราคา", start_url:".", display:"standalone",
-  background_color:"#f6f4ee", theme_color:"#20231f",
-  icons:[{ src:"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='20' fill='%2320231f'/%3E%3Ctext x='50' y='68' font-size='58' text-anchor='middle'%3E%F0%9F%8F%B7%EF%B8%8F%3C/text%3E%3C/svg%3E", sizes:"any", type:"image/svg+xml" }]
-};
-document.getElementById('manifestLink').href = URL.createObjectURL(new Blob([JSON.stringify(manifest)], {type:'application/json'}));
+/* ---------- Print ---------- */
+$('printBtn').addEventListener('click', () => {
+  if(state.defs.length === 0){ toast('ยังไม่มีป้ายให้พิมพ์'); return; }
+  if(!lastLayout.fits && !confirm('ป้ายใหญ่กว่าพื้นที่กระดาษ อาจถูกตัดขอบ ต้องการพิมพ์ต่อหรือไม่?')) return;
+  renderPrintArea();      // ให้แน่ใจว่าข้อมูลล่าสุด
+  window.print();
+});
+window.addEventListener('beforeprint', () => renderPrintArea());
+
+/* ---------- ฟอนต์: วัดใหม่เมื่อฟอนต์โหลดเสร็จ ---------- */
+if(document.fonts){
+  if(document.fonts.load){
+    Promise.all([
+      document.fonts.load("800 20px Kanit", "ก0"),
+      document.fonts.load("600 20px 'Noto Sans Thai'", "ก0")
+    ]).then(schedulePrint).catch(() => {});
+  }
+  if(document.fonts.addEventListener) document.fonts.addEventListener('loadingdone', schedulePrint);
+}
+
+/* ---------- PWA ---------- */
+if('serviceWorker' in navigator && /^https?:$/.test(location.protocol)){
+  window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+}
 
 /* ---------- Init ---------- */
 function renderAll(){ renderDefsList(); renderPrintArea(); save(); }
-load();
-if(state.defs.length===0){ state.defs.push({id:uid(), name:'น้ำดื่มขนาด 600 มล.', price:'10', unit:'บาท', qty:6}); }
+const hadSaved = load();
+if(!hadSaved && state.defs.length === 0){
+  state.defs.push({ id: uid(), name: 'น้ำดื่มขนาด 600 มล.', price: '10', unit: 'บาท', qty: 6 });
+}
+syncSettingsUI(true);
 renderAll();
 </script>
 
