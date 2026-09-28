@@ -190,8 +190,14 @@
     padding:14px 16px calc(14px + var(--safe-b));
     display:flex; justify-content:center;
   }
+  .barinner{ display:flex; gap:8px; width:100%; max-width:528px; }
+  .pdffab{
+    padding:15px 16px; border:none; border-radius:14px; background:var(--ink); color:#fff;
+    font-family:'Kanit',sans-serif; font-weight:700; font-size:15px; cursor:pointer; white-space:nowrap;
+  }
+  .linkbtn{ display:block; text-align:center; text-decoration:none; background:#efece2; color:var(--ink); margin-top:8px; }
   .printfab{
-    width:100%; max-width:528px; padding:15px; border:none; border-radius:14px;
+    flex:1; min-width:0; padding:15px; border:none; border-radius:14px;
     background:var(--accent); color:#fff; font-family:'Kanit',sans-serif; font-weight:700;
     font-size:16px; cursor:pointer; box-shadow:0 6px 18px rgba(193,57,31,.35);
     display:flex; align-items:center; justify-content:center; gap:8px;
@@ -309,10 +315,27 @@
 </main>
 
 <div class="bottombar">
-  <button class="printfab" id="printBtn">🖨 พิมพ์ / บันทึกเป็น PDF</button>
+  <div class="barinner">
+    <button class="printfab" id="printBtn">🖨 พิมพ์ / บันทึกเป็น PDF</button>
+    <button class="pdffab" id="pdfBtn" aria-label="สร้างไฟล์ PDF">📄 PDF</button>
+  </div>
 </div>
 
 <div class="toast" id="toast" role="status"></div>
+
+<div class="modal hidden" id="pdfModal">
+  <div class="modalcard">
+    <div class="closebar"><button id="pdfClose">ปิด ✕</button></div>
+    <h3>ไฟล์ PDF สำหรับพิมพ์</h3>
+    <p id="pdfStatus" style="font-size:14px; line-height:1.7; margin:0 0 14px;"></p>
+    <div id="pdfActions" style="display:none;">
+      <button class="bigbtn" id="pdfShare">📤 แชร์ / พิมพ์</button>
+      <a class="bigbtn linkbtn" id="pdfOpen" target="_blank" rel="noopener">👁 เปิดดู PDF</a>
+      <a class="bigbtn linkbtn" id="pdfDownload" download="price-tags.pdf">⬇ ดาวน์โหลดไฟล์</a>
+      <div class="instalhint">iPhone: กด "แชร์ / พิมพ์" แล้วเลื่อนเมนูหา <b>พิมพ์ (Print)</b> หรือเลือก "บันทึกไปยังไฟล์" แล้วพิมพ์จากแอปไฟล์</div>
+    </div>
+  </div>
+</div>
 
 <div class="modal hidden" id="settingsModal">
   <div class="modalcard">
@@ -430,7 +453,7 @@ $('settingsBtn').addEventListener('click', openSettings);
 $('closeSettings').addEventListener('click', closeSettings);
 $('doneSettings').addEventListener('click', closeSettings);
 settingsModal.addEventListener('click', e => { if(e.target === settingsModal) closeSettings(); });
-document.addEventListener('keydown', e => { if(e.key === 'Escape') closeSettings(); });
+document.addEventListener('keydown', e => { if(e.key === 'Escape'){ closeSettings(); closePdfModal(); } });
 
 /* full=false: อัปเดตแค่ปุ่มขนาด (ไม่เขียนทับช่องที่กำลังพิมพ์ เช่น "8." ) */
 function syncSettingsUI(full){
@@ -671,13 +694,236 @@ function updatePreviewScale(){
 window.addEventListener('resize', () => requestAnimationFrame(updatePreviewScale));
 
 /* ---------- Print ---------- */
+/* iPhone: เมื่อเปิดจากไอคอนหน้าจอโฮม (โหมดแอป) iOS ไม่รองรับ window.print()
+   จึงสร้างไฟล์ PDF ในเครื่อง แล้วให้แชร์/พิมพ์จากเมนูของ iOS แทน */
+const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+              (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+const isStandalone = navigator.standalone === true ||
+                     (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches);
+const pdfOnly = isIOS && isStandalone;
+if(pdfOnly){
+  $('printBtn').textContent = '🖨 สร้าง PDF เพื่อพิมพ์';
+  $('pdfBtn').style.display = 'none';
+}
+
+function canPrintNow(){
+  if(state.defs.length === 0){ toast('ยังไม่มีป้ายให้พิมพ์'); return false; }
+  if(!lastLayout.fits && !confirm('ป้ายใหญ่กว่าพื้นที่กระดาษ อาจถูกตัดขอบ ต้องการพิมพ์ต่อหรือไม่?')) return false;
+  return true;
+}
 $('printBtn').addEventListener('click', () => {
-  if(state.defs.length === 0){ toast('ยังไม่มีป้ายให้พิมพ์'); return; }
-  if(!lastLayout.fits && !confirm('ป้ายใหญ่กว่าพื้นที่กระดาษ อาจถูกตัดขอบ ต้องการพิมพ์ต่อหรือไม่?')) return;
+  if(!canPrintNow()) return;
+  if(pdfOnly){ exportPdf(); return; }
   renderPrintArea();      // ให้แน่ใจว่าข้อมูลล่าสุด
   window.print();
 });
+$('pdfBtn').addEventListener('click', () => { if(canPrintNow()) exportPdf(); });
 window.addEventListener('beforeprint', () => renderPrintArea());
+
+/* ---------- สร้าง PDF (วาดลง canvas แล้วประกอบเป็นไฟล์ PDF เอง ไม่ใช้ไลบรารีภายนอก) ---------- */
+function rr(ctx, x, y, w, h, r){
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
+}
+/* ตำแหน่ง baseline ในกล่องบรรทัดสูง lineH (เหมือนที่ CSS จัด half-leading) */
+function baselineOffset(ctx, size, lineH){
+  const m = ctx.measureText('กAgฟ');
+  const A = m.fontBoundingBoxAscent != null ? m.fontBoundingBoxAscent : size * 0.92;
+  const D = m.fontBoundingBoxDescent != null ? m.fontBoundingBoxDescent : size * 0.25;
+  return (lineH - (A + D)) / 2 + A;
+}
+function wrapLines(ctx, text, maxW, maxLines){
+  let segs;
+  try{ segs = Array.from(new Intl.Segmenter('th', { granularity:'word' }).segment(text), x => x.segment); }
+  catch(e){ segs = Array.from(text); }
+  const lines = []; let line = '';
+  const flush = () => { lines.push(line.trim()); line = ''; };
+  segs.forEach(seg => {
+    if(ctx.measureText(seg).width > maxW){          // คำเดียวยาวเกินบรรทัด → ตัดทีละตัวอักษร
+      Array.from(seg).forEach(ch => {
+        if(ctx.measureText(line + ch).width > maxW && line) flush();
+        line += ch;
+      });
+      return;
+    }
+    if(ctx.measureText(line + seg).width > maxW && line.trim()) flush();
+    line += seg;
+  });
+  if(line.trim()) flush();
+  if(lines.length > maxLines){
+    lines.length = maxLines;
+    let last = lines[maxLines - 1];
+    while(last && ctx.measureText(last + '…').width > maxW) last = last.slice(0, -1);
+    lines[maxLines - 1] = last + '…';
+  }
+  return lines;
+}
+function drawTag(ctx, d, s, x, y, W, H, k){
+  const lw = 0.0423 * k;                                   // ≈ 1.6px ของ CSS
+  if(state.border){
+    ctx.save();
+    ctx.strokeStyle = '#b9b3a2'; ctx.lineWidth = lw; ctx.setLineDash([lw * 3, lw * 2.2]);
+    rr(ctx, x + lw / 2, y + lw / 2, W - lw, H - lw, 0.106 * k); ctx.stroke();
+    ctx.restore();
+    ctx.save();
+    ctx.globalAlpha = 0.5; ctx.strokeStyle = '#cfa15a'; ctx.lineWidth = lw; ctx.setLineDash([]);
+    const cx = x + W * 0.05, cy = y + H * 0.05, cs = W * 0.10;
+    ctx.beginPath(); ctx.moveTo(cx, cy + cs); ctx.lineTo(cx, cy); ctx.lineTo(cx + cs, cy); ctx.stroke();
+    ctx.restore();
+  }
+  ctx.save();
+  ctx.beginPath(); ctx.rect(x, y, W, H); ctx.clip();
+  ctx.textBaseline = 'alphabetic';
+
+  const innerW = W * 0.84;
+  const nameSize = s.nameSize * k, nameLH = 1.15 * nameSize;
+  const nameFont = `600 ${nameSize}px ${NAME_FONT}`;
+  let lines = [];
+  if(d.name){ ctx.font = nameFont; lines = s.wrap ? wrapLines(ctx, d.name, innerW, 2) : [d.name]; }
+  const nameBlock = lines.length * nameLH;
+  const priceSize = s.priceSize * k;
+  const top = y + (H - (nameBlock + priceSize)) / 2;
+
+  if(lines.length){
+    ctx.font = nameFont; ctx.fillStyle = '#3a362c'; ctx.textAlign = 'center';
+    const off = baselineOffset(ctx, nameSize, nameLH);
+    lines.forEach((ln, i) => ctx.fillText(ln, x + W / 2, top + i * nameLH + off));
+  }
+
+  ctx.textAlign = 'left';
+  const priceFont = `800 ${priceSize}px ${PRICE_FONT}`;
+  const unitSize = s.unitSize * k, gap = s.gap * k;
+  const unitFont = `600 ${unitSize}px ${NAME_FONT}`;
+  ctx.font = priceFont;
+  const priceW = ctx.measureText(d.price).width;
+  const base = top + nameBlock + baselineOffset(ctx, priceSize, priceSize);
+  let unitW = 0;
+  if(d.unit){ ctx.font = unitFont; unitW = ctx.measureText(d.unit).width; }
+  const rowW = priceW + (d.unit ? gap + unitW : 0);
+  const px = x + (W - rowW) / 2;
+  ctx.fillStyle = '#c1391f';
+  ctx.font = priceFont; ctx.fillText(d.price, px, base);
+  if(d.unit){ ctx.font = unitFont; ctx.globalAlpha = 0.85; ctx.fillText(d.unit, px + priceW + gap, base); }
+  ctx.restore();
+}
+
+function blobToBuffer(blob){
+  if(blob.arrayBuffer) return blob.arrayBuffer();
+  return new Promise((res, rej) => {
+    const fr = new FileReader(); fr.onload = () => res(fr.result); fr.onerror = rej; fr.readAsArrayBuffer(blob);
+  });
+}
+/* ประกอบ PDF: 1 หน้า = 1 รูป JPEG เต็มหน้า */
+function makePdf(jpgs, pxW, pxH, wPt, hPt){
+  const enc = new TextEncoder(), parts = [], offsets = [];
+  let pos = 0;
+  const push = b => { const u = typeof b === 'string' ? enc.encode(b) : b; parts.push(u); pos += u.length; };
+  const n = jpgs.length;
+  push('%PDF-1.4\n%\xE2\xE3\xCF\xD3\n');
+  offsets[1] = pos; push('1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n');
+  const kids = jpgs.map((_, i) => `${3 + i * 3} 0 R`).join(' ');
+  offsets[2] = pos; push(`2 0 obj\n<< /Type /Pages /Kids [${kids}] /Count ${n} >>\nendobj\n`);
+  jpgs.forEach((jpg, i) => {
+    const pg = 3 + i * 3, ct = pg + 1, im = pg + 2;
+    offsets[pg] = pos;
+    push(`${pg} 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${wPt.toFixed(2)} ${hPt.toFixed(2)}] ` +
+         `/Resources << /XObject << /Im0 ${im} 0 R >> >> /Contents ${ct} 0 R >>\nendobj\n`);
+    const content = `q ${wPt.toFixed(2)} 0 0 ${hPt.toFixed(2)} 0 0 cm /Im0 Do Q`;
+    offsets[ct] = pos;
+    push(`${ct} 0 obj\n<< /Length ${content.length} >>\nstream\n${content}\nendstream\nendobj\n`);
+    offsets[im] = pos;
+    push(`${im} 0 obj\n<< /Type /XObject /Subtype /Image /Width ${pxW} /Height ${pxH} /ColorSpace /DeviceRGB ` +
+         `/BitsPerComponent 8 /Filter /DCTDecode /Length ${jpg.length} >>\nstream\n`);
+    push(jpg); push('\nendstream\nendobj\n');
+  });
+  const total = 3 + n * 3, xref = pos;
+  let x = `xref\n0 ${total}\n0000000000 65535 f \n`;
+  for(let i = 1; i < total; i++) x += String(offsets[i]).padStart(10, '0') + ' 00000 n \n';
+  push(x + `trailer\n<< /Size ${total} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`);
+  return new Blob(parts, { type:'application/pdf' });
+}
+
+async function ensureFonts(){
+  if(!document.fonts || !document.fonts.load) return;
+  const txt = state.defs.map(d => d.name + d.price + d.unit).join('') + 'ก0';
+  try{
+    await Promise.all([
+      document.fonts.load('800 40px Kanit', txt),
+      document.fonts.load("600 40px 'Noto Sans Thai'", txt)
+    ]);
+  }catch(e){}
+}
+async function buildPdfBlob(onProgress){
+  const L = getLayout();
+  const items = [];
+  state.defs.forEach(d => { const s = computeSizes(d); for(let i = 0; i < d.qty; i++) items.push({ d, s }); });
+  const pageCount = Math.ceil(items.length / L.perPage);
+  // 300 dpi แต่จำกัดจำนวนพิกเซลไม่ให้เกินที่ iPhone รับไหว (กระดาษใหญ่จะลด dpi ลงเอง)
+  const dpi = Math.min(300, Math.sqrt(12e6 / ((L.pw / 2.54) * (L.ph / 2.54))));
+  const k = dpi / 2.54;
+  const cw = Math.round(L.pw * k), ch = Math.round(L.ph * k);
+  const canvas = document.createElement('canvas'); canvas.width = cw; canvas.height = ch;
+  const ctx = canvas.getContext('2d');
+  const jpgs = [];
+  for(let p = 0; p < pageCount; p++){
+    if(onProgress) onProgress(p + 1, pageCount);
+    await new Promise(r => setTimeout(r, 30));            // ให้ UI อัปเดตความคืบหน้า
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, cw, ch);
+    items.slice(p * L.perPage, (p + 1) * L.perPage).forEach((it, i) => {
+      const col = i % L.cols, row = Math.floor(i / L.cols);
+      const x = (state.pgMargin + col * (state.w + state.gap)) * k;
+      const y = (state.pgMargin + row * (state.h + state.gap)) * k;
+      drawTag(ctx, it.d, it.s, x, y, state.w * k, state.h * k, k);
+    });
+    const blob = await new Promise(res => canvas.toBlob(res, 'image/jpeg', 0.92));
+    if(!blob) throw new Error('สร้างรูปหน้ากระดาษไม่ได้ (หน่วยความจำไม่พอ ลองลดจำนวนป้าย)');
+    jpgs.push(new Uint8Array(await blobToBuffer(blob)));
+  }
+  return { blob: makePdf(jpgs, cw, ch, L.pw / 2.54 * 72, L.ph / 2.54 * 72), pageCount };
+}
+
+/* ---------- หน้าต่างผลลัพธ์ PDF ---------- */
+const pdfModal = $('pdfModal'), pdfStatus = $('pdfStatus'), pdfActions = $('pdfActions');
+let pdfUrl = null, pdfFile = null, pdfBusy = false;
+function closePdfModal(){
+  pdfModal.classList.add('hidden');
+}
+$('pdfClose').addEventListener('click', closePdfModal);
+pdfModal.addEventListener('click', e => { if(e.target === pdfModal) closePdfModal(); });
+
+async function exportPdf(){
+  if(pdfBusy) return;
+  pdfBusy = true;
+  pdfActions.style.display = 'none';
+  pdfStatus.textContent = 'กำลังสร้าง PDF…';
+  pdfModal.classList.remove('hidden');
+  try{
+    await ensureFonts();
+    const { blob, pageCount } = await buildPdfBlob((p, n) => { pdfStatus.textContent = `กำลังสร้าง PDF… หน้า ${p}/${n}`; });
+    if(pdfUrl) URL.revokeObjectURL(pdfUrl);
+    pdfUrl = URL.createObjectURL(blob);
+    pdfFile = (typeof File === 'function') ? new File([blob], 'price-tags.pdf', { type:'application/pdf' }) : null;
+    $('pdfOpen').href = pdfUrl; $('pdfDownload').href = pdfUrl;
+    const canShare = !!(pdfFile && navigator.share && navigator.canShare && navigator.canShare({ files:[pdfFile] }));
+    $('pdfShare').style.display = canShare ? '' : 'none';
+    pdfStatus.textContent = `สร้างเสร็จแล้ว ${pageCount} หน้า (${Math.max(1, Math.round(blob.size / 1024))} KB)`;
+    pdfActions.style.display = '';
+  }catch(err){
+    pdfStatus.textContent = 'สร้าง PDF ไม่สำเร็จ: ' + (err && err.message ? err.message : err);
+  }finally{
+    pdfBusy = false;
+  }
+}
+$('pdfShare').addEventListener('click', async () => {
+  try{ await navigator.share({ files:[pdfFile], title:'ป้ายราคาสินค้า' }); }
+  catch(e){ if(e && e.name !== 'AbortError') toast('แชร์ไม่สำเร็จ ลองกด "เปิดดู PDF" แทน'); }
+});
 
 /* ---------- ฟอนต์: วัดใหม่เมื่อฟอนต์โหลดเสร็จ ---------- */
 if(document.fonts){
